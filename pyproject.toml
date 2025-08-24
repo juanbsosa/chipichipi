@@ -8,7 +8,7 @@ readme = "README.md"
 packages = [{ include = "chipichipi", from = "src" }]
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = ">=3.10, <3.12"
 mutagen = "^1.47.0"  # Essential for audio metadata
 
 # For the GUI.
