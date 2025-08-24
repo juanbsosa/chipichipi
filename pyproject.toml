@@ -1,0 +1,51 @@
+[tool.poetry]
+name = "ChipiChipi"
+version = "0.1.0"
+description = "A personal, local music manager and sync tool."
+authors = ["Juan Bautista Sosa <sosajuanbautista@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{ include = "chipichipi", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+mutagen = "^1.47.0"  # Essential for audio metadata
+
+# For the GUI.
+PySide6 = { version = "^6.5.0", optional = true }
+
+# For audio playback. python-vlc is powerful but requires VLC installed on the system.
+# python-vlc = { version = "^3.0.9", optional = true }
+# Alternatively, use pygame for simpler playback (less format support).
+# pygame = { version = "^2.5.0", optional = true }
+
+[tool.poetry.group.dev.dependencies]
+# Development and testing dependencies
+commitizen = "^3.5.2"        # For standardized commits
+pytest = "^7.4.0"            # Test framework
+pytest-cov = "^4.1.0"        # Test coverage plugin
+pytest-qt = "^4.2.0"         # For testing PyQt/PySide apps
+black = "^23.11.0"           # Code formatter (optional but recommended)
+isort = "^5.12.0"            # Import sorter (optional but recommended)
+
+[tool.poetry.extras]
+# This allows you to install optional groups: `poetry install --extras "gui playback"`
+gui = ["PySide6"]
+playback = ["python-vlc"]
+
+[tool.commitizen]
+name = "cz_conventional_commits"
+version = "0.1.0"
+version_files = [
+    "src/chipichipi/__init__.py:__version__",
+    "pyproject.toml:version"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=src/tunekeep --cov-report=term-missing"
+pythonpath = ["src"]  # Crucial: Helps pytest find your src module
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
