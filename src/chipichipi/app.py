@@ -10,6 +10,7 @@ import logging
 
 from chipichipi.worker import ScannerWorker
 from chipichipi.models import MusicTableModel
+from chipichipi.progress_dialog import ScanProgressDialog
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -161,6 +162,10 @@ class MainWindow(QMainWindow):
         self.scanner_worker.progress.connect(self.on_scan_progress)
         self.scanner_worker.count_updated.connect(self.on_count_updated)
         
+        # Connect new progress signals
+        self.scanner_worker.total_files_found.connect(self.on_total_files_found)
+        self.scanner_worker.file_processed.connect(self.on_file_processed)
+        
         # Connect thread start to worker scan method
         self.scanner_thread.started.connect(
             lambda: self.scanner_worker.scan(directory_path)
@@ -169,9 +174,27 @@ class MainWindow(QMainWindow):
         # Clean up when thread finishes
         self.scanner_thread.finished.connect(self.scanner_thread.deleteLater)
         
+        # Create progress dialog (but don't show it yet)
+        self.progress_dialog = None
+        self.total_files = 0  # Initialize total files counter
+        
         # Start the thread
         self.scanner_thread.start()
-        
+
+    def on_total_files_found(self, total_files):
+        """Handle total files found signal - create and show progress dialog."""
+        self.total_files = total_files
+        if self.progress_dialog is None:
+            self.progress_dialog = ScanProgressDialog(total_files, self)
+            self.progress_dialog.cancel_button.clicked.connect(self.cancel_scan)
+            self.progress_dialog.start_timer()
+            self.progress_dialog.show()
+
+    def on_file_processed(self, current_file, processed_count, total_files):
+        """Handle file processed signal - update progress dialog."""
+        if self.progress_dialog and self.progress_dialog.isVisible():
+            self.progress_dialog.update_progress(current_file, processed_count)
+
     def on_scan_started(self):
         """Handle scan started signal."""
         self.statusBar().showMessage("Scanning...")
@@ -179,15 +202,27 @@ class MainWindow(QMainWindow):
         for action in self.menuBar().actions():
             if action.text() and "Scan" in action.text():
                 action.setEnabled(False)
-                
+
+    def cancel_scan(self):
+        """Cancel the ongoing scan."""
+        if self.scanner_worker:
+            self.scanner_worker.cancel()
+        if self.progress_dialog:
+            self.progress_dialog.close()
+
     def on_scan_finished(self):
         """Handle scan finished signal."""
+        # Close progress dialog if it's open
+        if self.progress_dialog:
+            self.progress_dialog.close()
+            self.progress_dialog = None
+        
         self.statusBar().showMessage("Scan completed successfully")
         # Re-enable scan action
         for action in self.menuBar().actions():
             if action.text() and "Scan" in action.text():
                 action.setEnabled(True)
-                
+        
         # Refresh the library view
         self.refresh_library()
         
@@ -200,6 +235,11 @@ class MainWindow(QMainWindow):
             
     def on_scan_error(self, error_message: str):
         """Handle scan error signal."""
+        # Close progress dialog if it's open
+        if self.progress_dialog:
+            self.progress_dialog.close()
+            self.progress_dialog = None
+            
         self.statusBar().showMessage(f"Error: {error_message}")
         logging.error(error_message)
         

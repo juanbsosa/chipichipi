@@ -64,7 +64,7 @@ class MusicTableModel(QSqlTableModel):
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
             headers = [
                 "ID", "File Path", "Title", "Artist", "Album", 
-                "Track", "Duration", "Genre"
+                "Duration"
             ]
             if section < len(headers):
                 return headers[section]

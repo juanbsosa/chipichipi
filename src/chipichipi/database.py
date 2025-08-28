@@ -22,9 +22,7 @@ def init_db(db_path: Path):
             title TEXT,
             artist TEXT,
             album TEXT,
-            track_number INTEGER,
-            duration INTEGER,
-            genre TEXT
+            duration INTEGER
         )
     ''')
 

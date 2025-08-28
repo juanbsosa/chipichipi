@@ -1,9 +1,10 @@
 import logging
+import time
 from pathlib import Path
 from PySide6.QtCore import QObject, Signal
 
 from chipichipi.database import get_db_connection, init_db
-from chipichipi.scanner import scan_directory
+from chipichipi.scanner import scan_file, scan_directory  # Add scan_file import
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -16,13 +17,18 @@ class ScannerWorker(QObject):
     started = Signal()
     finished = Signal()
     error = Signal(str)
-    progress = Signal(str)  # Emit progress messages
-    count_updated = Signal(int)  # Emit new song count
+    progress = Signal(str)
+    count_updated = Signal(int)
+    
+    # New signals for progress dialog
+    total_files_found = Signal(int)  # Emit total number of files found
+    file_processed = Signal(Path, int, int)  # Emit (current_file, processed_count, total_files)
 
     def __init__(self, db_path: Path):
         super().__init__()
         self.db_path = db_path
         self._is_running = False
+        self.should_cancel = False
 
     def scan(self, directory_path: Path):
         """Perform the scan operation."""
@@ -31,6 +37,7 @@ class ScannerWorker(QObject):
             return
 
         self._is_running = True
+        self.should_cancel = False
         self.started.emit()
         
         try:
@@ -39,9 +46,34 @@ class ScannerWorker(QObject):
             conn = get_db_connection(self.db_path)
             
             try:
-                # Scan the directory
-                self.progress.emit(f"Scanning: {directory_path}")
-                scan_directory(directory_path, conn)
+                # First, count all audio files to get total
+                audio_files = []
+                for file_path in directory_path.rglob('*'):
+                    if file_path.suffix.lower() in ['.mp3', '.flac', '.m4a', '.wav', '.aiff']:
+                        audio_files.append(file_path)
+
+                total_files = len(audio_files)
+                self.total_files_found.emit(total_files)
+                self.progress.emit(f"Found {total_files} audio files to process")
+
+                # Now process each file
+                for index, file_path in enumerate(audio_files):
+                    if self.should_cancel:
+                        self.progress.emit("Scan cancelled by user")
+                        return
+                    
+                    # Emit progress for this file
+                    self.file_processed.emit(file_path, index + 1, total_files)
+                    
+                    song = scan_file(file_path)  # This should work now
+                    if song:
+                        from chipichipi.database import insert_song
+                        insert_song(conn, song)  # Fixed variable name from db_conn to conn
+
+                # Check if operation was cancelled
+                if self.should_cancel:
+                    self.progress.emit("Scan cancelled by user")
+                    return
                 
                 # Get the new count of songs
                 cursor = conn.cursor()
@@ -61,3 +93,7 @@ class ScannerWorker(QObject):
         finally:
             self._is_running = False
             self.finished.emit()
+    
+    def cancel(self):
+        """Cancel the ongoing scan operation."""
+        self.should_cancel = True

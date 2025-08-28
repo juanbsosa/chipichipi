@@ -242,3 +242,5 @@ logs/
 # Local configuration
 .env
 .secrets
+
+my_notes.txt
