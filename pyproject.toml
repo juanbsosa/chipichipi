@@ -14,10 +14,8 @@ mutagen = "^1.47.0"  # Essential for audio metadata
 # For the GUI.
 PySide6 = { version = "^6.5.0", optional = true }
 
-# For audio playback. python-vlc is powerful but requires VLC installed on the system.
-# python-vlc = { version = "^3.0.9", optional = true }
-# Alternatively, use pygame for simpler playback (less format support).
-# pygame = { version = "^2.5.0", optional = true }
+# For audio playback
+pygame = { version = "^2.5.0", optional = true }
 
 [tool.poetry.group.dev.dependencies]
 # Development and testing dependencies
@@ -31,7 +29,7 @@ isort = "^5.12.0"            # Import sorter (optional but recommended)
 [tool.poetry.extras]
 # This allows you to install optional groups: `poetry install --extras "gui playback"`
 gui = ["PySide6"]
-playback = ["python-vlc"]
+playback = ["pygame"]
 
 [tool.commitizen]
 name = "cz_conventional_commits"

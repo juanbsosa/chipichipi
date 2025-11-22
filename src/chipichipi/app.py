@@ -11,6 +11,8 @@ import logging
 from chipichipi.worker import ScannerWorker
 from chipichipi.models import MusicTableModel
 from chipichipi.progress_dialog import ScanProgressDialog
+from chipichipi.player import AudioPlayer
+from chipichipi.player_controls import PlayerControls
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -39,11 +41,80 @@ class MainWindow(QMainWindow):
         self.table_view = QTableView()
         layout.addWidget(self.table_view)
 
+        # Create player controls
+        self.setup_player_controls()
+        layout.addWidget(self.player_controls)
+
         # Create menu bar
         self.setup_menu()
         
         # Create status bar
         self.statusBar().showMessage("Ready")
+
+    def setup_player_controls(self):
+        """Set up the audio player controls."""
+        self.player_controls = PlayerControls()
+        self.audio_player = AudioPlayer()
+        
+        # Connect player control signals
+        self.player_controls.play_requested.connect(self.play_audio)
+        self.player_controls.pause_requested.connect(self.pause_audio)
+        self.player_controls.stop_requested.connect(self.stop_audio)
+        self.player_controls.position_change_requested.connect(self.seek_audio)
+        self.player_controls.volume_change_requested.connect(self.set_volume)
+        
+        # Connect player signals to controls
+        self.audio_player.position_changed.connect(self.update_player_position)
+        self.audio_player.duration_changed.connect(self.update_player_duration)
+        self.audio_player.playback_started.connect(lambda: self.update_player_state(True, False))
+        self.audio_player.playback_paused.connect(lambda: self.update_player_state(True, True))
+        self.audio_player.playback_stopped.connect(lambda: self.update_player_state(False, False))
+        self.audio_player.playback_ended.connect(lambda: self.update_player_state(False, False))
+
+    def update_player_state(self, is_playing: bool, is_paused: bool):
+        """Update UI based on playback state."""
+        self.player_controls.set_playing_state(is_playing, is_paused)
+
+    def update_player_position(self, position: float):
+        """Update player position display."""
+        self.player_controls.update_position(position, self.audio_player.duration)
+
+    def update_player_duration(self, duration: float):
+        """Update player duration display."""
+        self.player_controls.update_position(self.audio_player.position, duration)
+
+    def play_audio(self):
+        """Play the selected audio file."""
+        selection = self.table_view.selectionModel().selectedRows()
+        if selection:
+            index = selection[0]
+            file_path = self.model.data(self.model.index(index.row(), 1))  # File path is column 1
+            if file_path:
+                if self.audio_player.load_file(Path(file_path)):
+                    if self.audio_player.play():
+                        self.statusBar().showMessage(f"Playing: {Path(file_path).name}")
+                    else:
+                        self.statusBar().showMessage("Error starting playback")
+                else:
+                    error_msg = "Error loading audio file. Check if the file format is supported."
+                    self.statusBar().showMessage(error_msg)
+                    logging.warning(f"Failed to load audio file: {file_path}")
+
+    def pause_audio(self):
+        """Pause audio playback."""
+        self.audio_player.pause()
+
+    def stop_audio(self):
+        """Stop audio playback."""
+        self.audio_player.stop()
+
+    def seek_audio(self, position: float):
+        """Seek to specific position in audio."""
+        self.audio_player.set_position(position)
+
+    def set_volume(self, volume: float):
+        """Set audio volume."""
+        self.audio_player.set_volume(volume)
         
     def setup_menu(self):
         """Set up the menu bar."""
@@ -81,7 +152,25 @@ class MainWindow(QMainWindow):
         
         # Show song count in status bar
         self.update_song_count()
-        
+
+        # Connect double-click to play
+        self.table_view.doubleClicked.connect(self.on_song_double_clicked)
+
+    def on_song_double_clicked(self, index):
+        """Handle double-click on song - play it."""
+        if index.isValid():
+            file_path = self.model.data(self.model.index(index.row(), 1))  # File path is column 1
+            if file_path and Path(file_path).exists():
+                if self.audio_player.load_file(Path(file_path)):
+                    if self.audio_player.play():
+                        self.statusBar().showMessage(f"Playing: {Path(file_path).name}")
+                    else:
+                        self.statusBar().showMessage("Error starting playback")
+                else:
+                    error_msg = "Error loading audio file. Check if the file format is supported."
+                    self.statusBar().showMessage(error_msg)
+                    logging.warning(f"Failed to load audio file: {file_path}")
+
     def update_song_count(self):
         """Update the song count in the status bar."""
         if self.db.isOpen():
